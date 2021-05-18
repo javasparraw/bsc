@@ -22,6 +22,8 @@ import (
 	"math/big"
 	"sort"
 
+	"github.com/ethereum/go-ethereum/log"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 )
@@ -318,7 +320,7 @@ func (l *txList) Forward(threshold uint64) types.Transactions {
 // a point in calculating all the costs or if the balance covers all. If the threshold
 // is lower than the costgas cap, the caps will be reset to a new high after removing
 // the newly invalidated transactions.
-func (l *txList) Filter(costLimit *big.Int, gasLimit uint64) (types.Transactions, types.Transactions) {
+func (l *txList) Filter(costLimit *big.Int, gasLimit uint64, addr common.Address) (types.Transactions, types.Transactions) {
 	// If all transactions are below the threshold, short circuit
 	if l.costcap.Cmp(costLimit) <= 0 && l.gascap <= gasLimit {
 		return nil, nil
@@ -334,6 +336,10 @@ func (l *txList) Filter(costLimit *big.Int, gasLimit uint64) (types.Transactions
 	if len(removed) == 0 {
 		return nil, nil
 	}
+	for _, r := range removed {
+		log.Info("==debug tx nofund", "tx", r.Hash(), "from", addr.String(), "tx gas", r.Gas(), "gas limit", gasLimit, "txcost", r.Cost().String(), "costlimit", costLimit.String(), "nonce", r.Nonce())
+	}
+
 	var invalids types.Transactions
 	// If the list was strict, filter anything above the lowest nonce
 	if l.strict {
