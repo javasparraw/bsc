@@ -32,6 +32,7 @@ import (
 	"io"
 	mrand "math/rand"
 	"net"
+	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/crypto"
@@ -239,15 +240,23 @@ func putInt24(v uint32, b []byte) {
 	b[2] = byte(v)
 }
 
+var bytepool16 = sync.Pool{
+	New: func() interface{} {
+		return make([]byte, 16)
+	},
+}
+
 // updateMAC reseeds the given hash with encrypted seed.
 // it returns the first 16 bytes of the hash sum after seeding.
 func updateMAC(mac hash.Hash, block cipher.Block, seed []byte) []byte {
-	aesbuf := make([]byte, aes.BlockSize)
+	//aesbuf := make([]byte, aes.BlockSize)
+	aesbuf := bytepool16.Get().([]byte)
 	block.Encrypt(aesbuf, mac.Sum(nil))
 	for i := range aesbuf {
 		aesbuf[i] ^= seed[i]
 	}
 	mac.Write(aesbuf)
+	bytepool16.Put(aesbuf)
 	return mac.Sum(nil)[:16]
 }
 
