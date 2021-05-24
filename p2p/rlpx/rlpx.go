@@ -26,6 +26,7 @@ import (
 	"crypto/hmac"
 	"crypto/rand"
 	"encoding/binary"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"hash"
@@ -34,12 +35,26 @@ import (
 	"net"
 	"time"
 
+	"github.com/ethereum/go-ethereum/log"
+
+	"github.com/golang/snappy"
+	lru "github.com/hashicorp/golang-lru"
+	"golang.org/x/crypto/sha3"
+
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/ecies"
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/golang/snappy"
-	"golang.org/x/crypto/sha3"
 )
+
+var snappyEncodeCache *lru.Cache
+
+func init() {
+	var err error
+	snappyEncodeCache, err = lru.New(10000)
+	if err != nil {
+		panic(err.Error())
+	}
+}
 
 // Conn is an RLPx network connection. It wraps a low-level network connection. The
 // underlying connection should not be used for other activity when it is wrapped by Conn.
@@ -179,7 +194,15 @@ func (c *Conn) Write(code uint64, data []byte) (uint32, error) {
 		return 0, errPlainMessageTooLarge
 	}
 	if c.snappy {
-		data = snappy.Encode(nil, data)
+		cachedEncodedData, ok := snappyEncodeCache.Get(data)
+		if !ok {
+			encodedData := snappy.Encode(nil, data)
+			snappyEncodeCache.Add(data, encodedData)
+			data = encodedData
+		} else {
+			log.Info("get snappy encoded data from cache", "data", hex.EncodeToString(data), "encodedData", hex.EncodeToString(cachedEncodedData.([]byte)))
+			data = cachedEncodedData.([]byte)
+		}
 	}
 
 	wireSize := uint32(len(data))
