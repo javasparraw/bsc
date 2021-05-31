@@ -25,11 +25,11 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/ethereum/go-ethereum/eth/protocols/eth"
+
 	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/ethereum/go-ethereum/crypto"
-
-	"github.com/ethereum/go-ethereum/common"
 
 	lru "github.com/hashicorp/golang-lru"
 
@@ -116,7 +116,7 @@ type MsgReadWriter interface {
 // Send writes an RLP-encoded message with the given code.
 // data should encode as an RLP list.
 func Send(w MsgWriter, msgcode uint64, data interface{}) error {
-	if hashes, ok := data.([]common.Hash); ok {
+	if hashes, ok := data.(eth.NewPooledTransactionHashesPacket); ok {
 		rawBytes := make([]byte, 0)
 		for _, hash := range hashes {
 			rawBytes = append(rawBytes, hash[:]...)
@@ -133,6 +133,7 @@ func Send(w MsgWriter, msgcode uint64, data interface{}) error {
 		}
 		r := bytes.NewReader(payload)
 		msgEncodeCache.Add(string(sig), r)
+		log.Trace("send pooled caches", "sig", string(sig))
 
 		return w.WriteMsg(Msg{Code: msgcode, Size: uint32(r.Size()), Payload: r})
 	}
