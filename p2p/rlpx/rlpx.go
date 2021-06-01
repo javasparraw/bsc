@@ -197,7 +197,7 @@ func (c *Conn) Write(code uint64, data []byte) (uint32, error) {
 		} else {
 			encodedData := snappy.Encode(nil, data)
 			snappyCache.Set(data, encodedData)
-			log.Info("set snappy result to cache", "origin", hex.EncodeToString(data), "result", hex.EncodeToString(encodedResult))
+			log.Info("set snappy result to cache", "origin", hex.EncodeToString(data), "result", hex.EncodeToString(encodedData))
 
 			data = encodedData
 		}
