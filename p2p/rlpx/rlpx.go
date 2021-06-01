@@ -26,7 +26,6 @@ import (
 	"crypto/hmac"
 	"crypto/rand"
 	"encoding/binary"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"hash"
@@ -34,8 +33,6 @@ import (
 	mrand "math/rand"
 	"net"
 	"time"
-
-	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/VictoriaMetrics/fastcache"
 
@@ -192,12 +189,10 @@ func (c *Conn) Write(code uint64, data []byte) (uint32, error) {
 	}
 	if c.snappy {
 		if encodedResult, ok := snappyCache.HasGet(nil, data); ok {
-			log.Info("get snappy result from cache", "origin", hex.EncodeToString(data), "result", hex.EncodeToString(encodedResult))
 			data = encodedResult
 		} else {
 			encodedData := snappy.Encode(nil, data)
 			snappyCache.Set(data, encodedData)
-			log.Info("set snappy result to cache", "origin", hex.EncodeToString(data), "result", hex.EncodeToString(encodedData))
 
 			data = encodedData
 		}
