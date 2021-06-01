@@ -25,28 +25,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/ethereum/go-ethereum/eth/protocols/eth"
-
-	"github.com/ethereum/go-ethereum/log"
-
-	"github.com/ethereum/go-ethereum/crypto"
-
-	lru "github.com/hashicorp/golang-lru"
-
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/rlp"
 )
-
-var msgEncodeCache *lru.Cache
-
-func init() {
-	var err error
-	msgEncodeCache, err = lru.New(10000)
-	if err != nil {
-		panic(err.Error())
-	}
-}
 
 // Msg defines the structure of a p2p message.
 //
@@ -116,28 +98,6 @@ type MsgReadWriter interface {
 // Send writes an RLP-encoded message with the given code.
 // data should encode as an RLP list.
 func Send(w MsgWriter, msgcode uint64, data interface{}) error {
-	if hashes, ok := data.(eth.NewPooledTransactionHashesPacket); ok {
-		rawBytes := make([]byte, 0)
-		for _, hash := range hashes {
-			rawBytes = append(rawBytes, hash[:]...)
-		}
-
-		sig := crypto.Keccak256(rawBytes)
-		if cachedReader, ok := msgEncodeCache.Get(string(sig)); ok {
-			log.Info("get cached hashes", "sig", string(sig))
-			return w.WriteMsg(Msg{Code: msgcode, Size: uint32(cachedReader.(*bytes.Reader).Size()), Payload: cachedReader.(*bytes.Reader)})
-		}
-		payload, err := rlp.EncodeToBytes(data)
-		if err != nil {
-			return err
-		}
-		r := bytes.NewReader(payload)
-		msgEncodeCache.Add(string(sig), r)
-		log.Trace("send pooled caches", "sig", string(sig))
-
-		return w.WriteMsg(Msg{Code: msgcode, Size: uint32(r.Size()), Payload: r})
-	}
-
 	size, r, err := rlp.EncodeToReader(data)
 	if err != nil {
 		return err
