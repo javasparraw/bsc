@@ -22,6 +22,8 @@ import (
 	"math/big"
 	"sort"
 
+	lru "github.com/hashicorp/golang-lru"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -30,6 +32,16 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 )
+
+var receiptsDecodeCache *lru.Cache
+
+func init() {
+	var err error
+	receiptsDecodeCache, err = lru.New(10000)
+	if err != nil {
+		panic(err.Error())
+	}
+}
 
 // ReadCanonicalHash retrieves the hash assigned to a canonical block number.
 func ReadCanonicalHash(db ethdb.Reader, number uint64) common.Hash {
@@ -569,6 +581,11 @@ func ReadRawReceipts(db ethdb.Reader, hash common.Hash, number uint64) types.Rec
 	if len(data) == 0 {
 		return nil
 	}
+	dataHash := crypto.Keccak256(data)
+	if result, ok := receiptsDecodeCache.Get(string(dataHash)); ok {
+		return result.(types.Receipts)
+	}
+
 	// Convert the receipts from their storage form to their internal representation
 	storageReceipts := []*types.ReceiptForStorage{}
 	if err := rlp.DecodeBytes(data, &storageReceipts); err != nil {
@@ -579,6 +596,7 @@ func ReadRawReceipts(db ethdb.Reader, hash common.Hash, number uint64) types.Rec
 	for i, storageReceipt := range storageReceipts {
 		receipts[i] = (*types.Receipt)(storageReceipt)
 	}
+	receiptsDecodeCache.Add(string(dataHash), receipts)
 	return receipts
 }
 
